@@ -135,7 +135,10 @@
                             </button>
                         </div>
                         
-                        <form id="paymentForm" action="success.html" method="GET">
+                        <form id="paymentForm">
+                            <!-- Hidden input for payment method -->
+                            <input type="hidden" id="paymentMethod" name="paymentMethod" value="">
+                            
                             <div class="mb-3">
                                 <label for="senderNumber" class="form-label">আপনার পেমেন্ট নাম্বার *</label>
                                 <input type="tel" class="form-control" id="senderNumber" name="senderNumber" required>
@@ -145,8 +148,8 @@
                                 <input type="text" class="form-control" id="transactionId" name="transactionId" required>
                             </div>
                             <div class="mb-3">
-                                <label for="screenshot" class="form-label">পেমেন্ট স্ক্রিনশট *</label>
-                                <input type="file" class="form-control" id="screenshot" name="screenshot" accept="image/*" required>
+                                <label for="paymentScreenshot" class="form-label">পেমেন্ট স্ক্রিনশট *</label>
+                                <input type="file" class="form-control" id="paymentScreenshot" name="paymentScreenshot" accept="image/*" required>
                             </div>
                             <div class="text-center">
                                 <button type="submit" class="btn btn-primary btn-lg">পেমেন্ট কনফার্ম করুন</button>
@@ -164,6 +167,7 @@
         const paymentMethods = document.querySelectorAll('.payment-method');
         const paymentDetails = document.getElementById('paymentDetails');
         const paymentNumber = document.getElementById('paymentNumber');
+        const paymentMethodInput = document.getElementById('paymentMethod');
         
         const paymentNumbers = {
             'bkash': '01639902560',
@@ -182,6 +186,8 @@
                 // Set payment number
                 const selectedMethod = this.dataset.method;
                 paymentNumber.textContent = paymentNumbers[selectedMethod];
+                // Set hidden input value
+                paymentMethodInput.value = selectedMethod;
             });
         });
 
@@ -197,26 +203,95 @@
         document.getElementById('paymentForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Get form data
+            // Check if payment method is selected
+            if (!paymentMethodInput.value) {
+                alert('দয়া করে একটি পেমেন্ট মাধ্যম নির্বাচন করুন!');
+                return;
+            }
+            
+            // Get form data except file inputs
             const formData = new FormData(this);
             const paymentData = {};
-            formData.forEach((value, key) => paymentData[key] = value);
+            
+            for (let [key, value] of formData.entries()) {
+                if (key !== 'paymentScreenshot') {
+                    paymentData[key] = value;
+                }
+            }
+            
+            // Get file data
+            const screenshotFile = document.getElementById('paymentScreenshot').files[0];
             
             // Get order data from localStorage
             const orderData = JSON.parse(localStorage.getItem('orderData') || '{}');
             
-            // Combine order and payment data
-            const finalOrderData = {
-                ...orderData,
-                ...paymentData,
-                paymentMethod: document.querySelector('input[name="paymentMethod"]:checked').value
-            };
-            
-            // Save final order data
-            localStorage.setItem('finalOrderData', JSON.stringify(finalOrderData));
-            
-            // Redirect to success page
-            window.location.href = 'success.html';
+            // Get product image from previous page if available
+            if (sessionStorage.getItem('productImageAvailable') === 'true') {
+                const productImageInput = document.createElement('input');
+                productImageInput.type = 'file';
+                productImageInput.id = 'tempProductImage';
+                productImageInput.style.display = 'none';
+                document.body.appendChild(productImageInput);
+                
+                // Show a loading overlay while processing
+                const loadingOverlay = document.createElement('div');
+                loadingOverlay.style.position = 'fixed';
+                loadingOverlay.style.top = '0';
+                loadingOverlay.style.left = '0';
+                loadingOverlay.style.width = '100%';
+                loadingOverlay.style.height = '100%';
+                loadingOverlay.style.background = 'rgba(0, 0, 0, 0.5)';
+                loadingOverlay.style.display = 'flex';
+                loadingOverlay.style.justifyContent = 'center';
+                loadingOverlay.style.alignItems = 'center';
+                loadingOverlay.style.zIndex = '9999';
+                
+                const loadingSpinner = document.createElement('div');
+                loadingSpinner.className = 'spinner-border text-light';
+                loadingSpinner.setAttribute('role', 'status');
+                loadingSpinner.innerHTML = '<span class="visually-hidden">Loading...</span>';
+                
+                loadingOverlay.appendChild(loadingSpinner);
+                document.body.appendChild(loadingOverlay);
+                
+                // Combine order and payment data
+                const finalOrderData = {
+                    ...orderData,
+                    ...paymentData,
+                    paymentScreenshot: screenshotFile
+                };
+                
+                // Save final order data
+                localStorage.setItem('finalOrderData', JSON.stringify(finalOrderData, (key, value) => {
+                    // Skip File objects in JSON.stringify
+                    if (value instanceof File) {
+                        return undefined;
+                    }
+                    return value;
+                }));
+                
+                // Redirect to success page
+                window.location.href = 'success.html';
+            } else {
+                // If no product image, proceed normally
+                const finalOrderData = {
+                    ...orderData,
+                    ...paymentData,
+                    paymentScreenshot: screenshotFile
+                };
+                
+                // Save final order data
+                localStorage.setItem('finalOrderData', JSON.stringify(finalOrderData, (key, value) => {
+                    // Skip File objects in JSON.stringify
+                    if (value instanceof File) {
+                        return undefined;
+                    }
+                    return value;
+                }));
+                
+                // Redirect to success page
+                window.location.href = 'success.html';
+            }
         });
     </script>
 </body>
