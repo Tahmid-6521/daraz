@@ -239,39 +239,67 @@
         document.getElementById('orderForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Store form data in localStorage
-            const formData = new FormData(this);
-            const data = {};
+            // Get basic form data
+            const data = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                address: document.getElementById('address').value,
+                productLink: document.getElementById('productLink').value
+            };
             
-            // Process all form fields except files
-            for (let [key, value] of formData.entries()) {
-                if (key !== 'productImage') {
-                    data[key] = value;
-                }
-            }
-            
-            // Get file data
+            // Show loading overlay for image processing
             const productImageFile = document.getElementById('productImage').files[0];
+            
             if (productImageFile) {
-                data.productImage = productImageFile;
+                // Create and show loading overlay
+                const loadingOverlay = document.createElement('div');
+                loadingOverlay.style.position = 'fixed';
+                loadingOverlay.style.top = '0';
+                loadingOverlay.style.left = '0';
+                loadingOverlay.style.width = '100%';
+                loadingOverlay.style.height = '100%';
+                loadingOverlay.style.background = 'rgba(0, 0, 0, 0.5)';
+                loadingOverlay.style.display = 'flex';
+                loadingOverlay.style.justifyContent = 'center';
+                loadingOverlay.style.alignItems = 'center';
+                loadingOverlay.style.zIndex = '9999';
+                
+                const loadingSpinner = document.createElement('div');
+                loadingSpinner.className = 'spinner-border text-light';
+                loadingSpinner.setAttribute('role', 'status');
+                loadingSpinner.innerHTML = '<span class="visually-hidden">Loading...</span>';
+                
+                loadingOverlay.appendChild(loadingSpinner);
+                document.body.appendChild(loadingOverlay);
+                
+                // Convert product image to base64
+                const reader = new FileReader();
+                
+                reader.onload = function(event) {
+                    // Add the base64 data URL to the form data
+                    data.productImage = event.target.result;
+                    
+                    // Save data and redirect
+                    localStorage.setItem('orderData', JSON.stringify(data));
+                    console.log('Order data with image saved successfully');
+                    
+                    // Redirect to payment page
+                    window.location.href = 'pay.html';
+                };
+                
+                reader.onerror = function(error) {
+                    console.error('Error reading file:', error);
+                    document.body.removeChild(loadingOverlay);
+                    alert('ছবি প্রসেস করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
+                };
+                
+                // Start reading the file as data URL
+                reader.readAsDataURL(productImageFile);
+            } else {
+                // No image, just save the data and redirect
+                localStorage.setItem('orderData', JSON.stringify(data));
+                window.location.href = 'pay.html';
             }
-            
-            // Save data to localStorage
-            localStorage.setItem('orderData', JSON.stringify(data, (key, value) => {
-                // Skip File objects in JSON.stringify
-                if (value instanceof File) {
-                    return undefined;
-                }
-                return value;
-            }));
-            
-            // Store File objects in sessionStorage temporarily
-            if (productImageFile) {
-                sessionStorage.setItem('productImageAvailable', 'true');
-            }
-            
-            // Redirect to payment page
-            window.location.href = 'pay.html';
         });
     </script>
 </body>
