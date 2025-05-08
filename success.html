@@ -173,6 +173,16 @@
             const orderData = JSON.parse(localStorage.getItem('finalOrderData'));
             const orderId = generateOrderId();
             
+            // Check if there are image files to handle from pay.html
+            const hasPaymentScreenshot = sessionStorage.getItem('paymentScreenshotAvailable') === 'true';
+            console.log('Payment screenshot available:', hasPaymentScreenshot);
+            
+            if (hasPaymentScreenshot) {
+                console.log('Processing payment screenshot before saving order');
+                // Clear the session storage flag
+                sessionStorage.removeItem('paymentScreenshotAvailable');
+            }
+            
             // Save the order for tracking
             saveOrderToStorage(orderData, orderId);
             
@@ -200,74 +210,47 @@
         
         // Save order data to storage for tracking
         function saveOrderToStorage(orderData, orderId) {
+            console.log('Starting saveOrderToStorage with orderData:', Object.keys(orderData));
+            
             // Add additional data for tracking
-            orderData.orderId = orderId;
-            orderData.status = 'processing';
-            orderData.createdAt = new Date().toISOString();
+            const processedOrder = {
+                ...orderData,
+                orderId: orderId,
+                status: 'processing',
+                createdAt: new Date().toISOString()
+            };
             
-            // Process files and then save order
-            let filesToProcess = 0;
-            let processedFiles = 0;
-            
-            // Create a deep copy of orderData without file objects for processing
-            const orderDataCopy = JSON.parse(JSON.stringify(orderData, (key, value) => {
-                if (value instanceof File) {
-                    return undefined; // Exclude File objects from JSON
-                }
-                return value;
-            }));
-            
-            // Process product image if it exists
-            if (orderData.productImage instanceof File) {
-                filesToProcess++;
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    orderDataCopy.productImage = e.target.result;
-                    processedFiles++;
-                    if (processedFiles === filesToProcess) {
-                        saveOrderToLocalStorage(orderDataCopy);
-                    }
-                };
-                reader.readAsDataURL(orderData.productImage);
+            // Log for debugging
+            if (processedOrder.paymentScreenshot) {
+                console.log('Payment screenshot exists:', processedOrder.paymentScreenshot.substring(0, 50) + '...');
+            }
+            if (processedOrder.productImage) {
+                console.log('Product image exists:', processedOrder.productImage.substring(0, 50) + '...');
             }
             
-            // Process payment screenshot if it exists
-            if (orderData.paymentScreenshot instanceof File) {
-                filesToProcess++;
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    orderDataCopy.paymentScreenshot = e.target.result;
-                    processedFiles++;
-                    if (processedFiles === filesToProcess) {
-                        saveOrderToLocalStorage(orderDataCopy);
-                    }
-                };
-                reader.readAsDataURL(orderData.paymentScreenshot);
-            }
-            
-            // If no files to process, save immediately
-            if (filesToProcess === 0) {
-                saveOrderToLocalStorage(orderDataCopy);
-            }
-        }
-        
-        function saveOrderToLocalStorage(orderData) {
             // Get existing orders or initialize empty array
             const existingOrders = JSON.parse(localStorage.getItem('allOrders') || '[]');
             
             // Check if order already exists
-            const existingOrderIndex = existingOrders.findIndex(order => order.orderId === orderData.orderId);
+            const existingOrderIndex = existingOrders.findIndex(order => order.orderId === processedOrder.orderId);
             
             if (existingOrderIndex !== -1) {
                 // Update existing order
-                existingOrders[existingOrderIndex] = orderData;
+                existingOrders[existingOrderIndex] = processedOrder;
             } else {
                 // Add new order
-                existingOrders.push(orderData);
+                existingOrders.push(processedOrder);
             }
             
             // Save updated orders array
             localStorage.setItem('allOrders', JSON.stringify(existingOrders));
+            console.log('Order saved successfully:', processedOrder.orderId);
+        }
+
+        // Function is no longer needed as it's incorporated above
+        function saveOrderToLocalStorage(orderData) {
+            // This function is now integrated into saveOrderToStorage
+            console.log('saveOrderToLocalStorage called but not used');
         }
 
         // Download PDF
