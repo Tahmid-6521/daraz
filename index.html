@@ -238,11 +238,38 @@
         // Form submission handling
         document.getElementById('orderForm').addEventListener('submit', function(e) {
             e.preventDefault();
+            
             // Store form data in localStorage
             const formData = new FormData(this);
             const data = {};
-            formData.forEach((value, key) => data[key] = value);
-            localStorage.setItem('orderData', JSON.stringify(data));
+            
+            // Process all form fields except files
+            for (let [key, value] of formData.entries()) {
+                if (key !== 'productImage') {
+                    data[key] = value;
+                }
+            }
+            
+            // Get file data
+            const productImageFile = document.getElementById('productImage').files[0];
+            if (productImageFile) {
+                data.productImage = productImageFile;
+            }
+            
+            // Save data to localStorage
+            localStorage.setItem('orderData', JSON.stringify(data, (key, value) => {
+                // Skip File objects in JSON.stringify
+                if (value instanceof File) {
+                    return undefined;
+                }
+                return value;
+            }));
+            
+            // Store File objects in sessionStorage temporarily
+            if (productImageFile) {
+                sessionStorage.setItem('productImageAvailable', 'true');
+            }
+            
             // Redirect to payment page
             window.location.href = 'pay.html';
         });
