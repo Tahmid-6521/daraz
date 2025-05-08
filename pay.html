@@ -85,6 +85,19 @@
             font-weight: 600;
             color: #333;
         }
+        
+        .payment-instructions {
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: #f8f9fa;
+            border-left: 4px solid #ff4747;
+            margin-bottom: 20px;
+        }
+        
+        .payment-instructions i {
+            color: #ff4747;
+        }
     </style>
 </head>
 <body>
@@ -135,17 +148,28 @@
                             </button>
                         </div>
                         
+                        <!-- Payment Instructions -->
+                        <div id="bkashInstructions" class="payment-instructions mb-3" style="display: none;">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>বিকাশ থেকে আমাদের নাম্বারে ৫০ টাকা সেন্ড মানি করুন তারপর নিচের ফরম টি পূরণ করুন ।</strong>
+                        </div>
+                        
+                        <div id="nagadInstructions" class="payment-instructions mb-3" style="display: none;">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>নগদ থেকে আমাদের নাম্বারে ৫০ টাকা সেন্ড মানি করুন তারপর নিচের ফরম টি পূরণ করুন ।</strong>
+                        </div>
+                        
                         <form id="paymentForm">
                             <!-- Hidden input for payment method -->
                             <input type="hidden" id="paymentMethod" name="paymentMethod" value="">
                             
                             <div class="mb-3">
-                                <label for="senderNumber" class="form-label">আপনার পেমেন্ট নাম্বার *</label>
+                                <label for="senderNumber" class="form-label" id="senderNumberLabel">আপনার পেমেন্ট নাম্বার *</label>
                                 <input type="tel" class="form-control" id="senderNumber" name="senderNumber" required>
                             </div>
                             <div class="mb-3">
-                                <label for="transactionId" class="form-label">ট্রানজেকশন আইডি *</label>
-                                <input type="text" class="form-control" id="transactionId" name="transactionId" required>
+                                <label for="transactionId" class="form-label">ট্রানজেকশন আইডি <span class="text-muted">(Not Required)</span></label>
+                                <input type="text" class="form-control" id="transactionId" name="transactionId">
                             </div>
                             <div class="mb-3">
                                 <label for="paymentScreenshot" class="form-label">পেমেন্ট স্ক্রিনশট *</label>
@@ -168,6 +192,8 @@
         const paymentDetails = document.getElementById('paymentDetails');
         const paymentNumber = document.getElementById('paymentNumber');
         const paymentMethodInput = document.getElementById('paymentMethod');
+        const bkashInstructions = document.getElementById('bkashInstructions');
+        const nagadInstructions = document.getElementById('nagadInstructions');
         
         const paymentNumbers = {
             'bkash': '01639902560',
@@ -188,6 +214,18 @@
                 paymentNumber.textContent = paymentNumbers[selectedMethod];
                 // Set hidden input value
                 paymentMethodInput.value = selectedMethod;
+                
+                // Show appropriate instructions
+                bkashInstructions.style.display = selectedMethod === 'bkash' ? 'block' : 'none';
+                nagadInstructions.style.display = selectedMethod === 'nagad' ? 'block' : 'none';
+                
+                // Update sender number label based on payment method
+                const senderNumberLabel = document.getElementById('senderNumberLabel');
+                if (selectedMethod === 'bkash') {
+                    senderNumberLabel.innerHTML = 'আপনার বিকাশ নাম্বার লিখুন যেটা থেকে আমাদের নাম্বার টাকা পাঠিয়েছেন *';
+                } else if (selectedMethod === 'nagad') {
+                    senderNumberLabel.innerHTML = 'আপনার নগদ নাম্বার লিখুন যেটা থেকে আমাদের নাম্বার টাকা পাঠিয়েছেন *';
+                }
             });
         });
 
@@ -209,87 +247,78 @@
                 return;
             }
             
-            // Get form data except file inputs
-            const formData = new FormData(this);
-            const paymentData = {};
+            // Show loading overlay
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.style.position = 'fixed';
+            loadingOverlay.style.top = '0';
+            loadingOverlay.style.left = '0';
+            loadingOverlay.style.width = '100%';
+            loadingOverlay.style.height = '100%';
+            loadingOverlay.style.background = 'rgba(0, 0, 0, 0.5)';
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.justifyContent = 'center';
+            loadingOverlay.style.alignItems = 'center';
+            loadingOverlay.style.zIndex = '9999';
             
-            for (let [key, value] of formData.entries()) {
-                if (key !== 'paymentScreenshot') {
-                    paymentData[key] = value;
-                }
-            }
+            const loadingSpinner = document.createElement('div');
+            loadingSpinner.className = 'spinner-border text-light';
+            loadingSpinner.setAttribute('role', 'status');
+            loadingSpinner.innerHTML = '<span class="visually-hidden">Loading...</span>';
             
-            // Get file data
-            const screenshotFile = document.getElementById('paymentScreenshot').files[0];
+            loadingOverlay.appendChild(loadingSpinner);
+            document.body.appendChild(loadingOverlay);
+            
+            // Get basic form data
+            const paymentData = {
+                paymentMethod: paymentMethodInput.value,
+                senderNumber: document.getElementById('senderNumber').value,
+                transactionId: document.getElementById('transactionId').value || ''
+            };
             
             // Get order data from localStorage
             const orderData = JSON.parse(localStorage.getItem('orderData') || '{}');
             
-            // Get product image from previous page if available
-            if (sessionStorage.getItem('productImageAvailable') === 'true') {
-                const productImageInput = document.createElement('input');
-                productImageInput.type = 'file';
-                productImageInput.id = 'tempProductImage';
-                productImageInput.style.display = 'none';
-                document.body.appendChild(productImageInput);
+            // Process screenshot file
+            const screenshotFile = document.getElementById('paymentScreenshot').files[0];
+            
+            if (screenshotFile) {
+                // Convert file to base64 directly
+                const reader = new FileReader();
                 
-                // Show a loading overlay while processing
-                const loadingOverlay = document.createElement('div');
-                loadingOverlay.style.position = 'fixed';
-                loadingOverlay.style.top = '0';
-                loadingOverlay.style.left = '0';
-                loadingOverlay.style.width = '100%';
-                loadingOverlay.style.height = '100%';
-                loadingOverlay.style.background = 'rgba(0, 0, 0, 0.5)';
-                loadingOverlay.style.display = 'flex';
-                loadingOverlay.style.justifyContent = 'center';
-                loadingOverlay.style.alignItems = 'center';
-                loadingOverlay.style.zIndex = '9999';
-                
-                const loadingSpinner = document.createElement('div');
-                loadingSpinner.className = 'spinner-border text-light';
-                loadingSpinner.setAttribute('role', 'status');
-                loadingSpinner.innerHTML = '<span class="visually-hidden">Loading...</span>';
-                
-                loadingOverlay.appendChild(loadingSpinner);
-                document.body.appendChild(loadingOverlay);
-                
-                // Combine order and payment data
-                const finalOrderData = {
-                    ...orderData,
-                    ...paymentData,
-                    paymentScreenshot: screenshotFile
+                reader.onload = function(event) {
+                    const base64String = event.target.result;
+                    
+                    // Combine all data with base64 screenshot
+                    const finalOrderData = {
+                        ...orderData,
+                        ...paymentData,
+                        paymentScreenshot: base64String
+                    };
+                    
+                    // Save data and redirect
+                    localStorage.setItem('finalOrderData', JSON.stringify(finalOrderData));
+                    console.log('Order data with screenshot saved successfully');
+                    
+                    // Redirect to success page
+                    window.location.href = 'success.html';
                 };
                 
-                // Save final order data
-                localStorage.setItem('finalOrderData', JSON.stringify(finalOrderData, (key, value) => {
-                    // Skip File objects in JSON.stringify
-                    if (value instanceof File) {
-                        return undefined;
-                    }
-                    return value;
-                }));
+                reader.onerror = function(error) {
+                    console.error('Error reading file:', error);
+                    document.body.removeChild(loadingOverlay);
+                    alert('স্ক্রিনশট প্রসেস করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
+                };
                 
-                // Redirect to success page
-                window.location.href = 'success.html';
+                // Start reading the file as data URL (base64)
+                reader.readAsDataURL(screenshotFile);
             } else {
-                // If no product image, proceed normally
+                // If no screenshot, proceed normally
                 const finalOrderData = {
                     ...orderData,
-                    ...paymentData,
-                    paymentScreenshot: screenshotFile
+                    ...paymentData
                 };
                 
-                // Save final order data
-                localStorage.setItem('finalOrderData', JSON.stringify(finalOrderData, (key, value) => {
-                    // Skip File objects in JSON.stringify
-                    if (value instanceof File) {
-                        return undefined;
-                    }
-                    return value;
-                }));
-                
-                // Redirect to success page
+                localStorage.setItem('finalOrderData', JSON.stringify(finalOrderData));
                 window.location.href = 'success.html';
             }
         });
