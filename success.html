@@ -182,6 +182,7 @@
                 <p><strong>মোবাইল নাম্বার:</strong> ${orderData.phone}</p>
                 <p><strong>ডেলিভারি ঠিকানা:</strong> ${orderData.address}</p>
                 <p><strong>প্রোডাক্ট লিংক:</strong> ${orderData.productLink || 'উল্লেখ করা হয়নি'}</p>
+                <p><strong>পেমেন্ট মেথড:</strong> ${orderData.paymentMethod}</p>
                 <p><strong>পেমেন্ট নাম্বার:</strong> ${orderData.senderNumber}</p>
                 <p><strong>ট্রানজেকশন আইডি:</strong> ${orderData.transactionId}</p>
             `;
@@ -204,27 +205,49 @@
             orderData.status = 'processing';
             orderData.createdAt = new Date().toISOString();
             
-            // Convert File objects to base64 strings if they exist
+            // Process files and then save order
+            let filesToProcess = 0;
+            let processedFiles = 0;
+            
+            // Create a deep copy of orderData without file objects for processing
+            const orderDataCopy = JSON.parse(JSON.stringify(orderData, (key, value) => {
+                if (value instanceof File) {
+                    return undefined; // Exclude File objects from JSON
+                }
+                return value;
+            }));
+            
+            // Process product image if it exists
             if (orderData.productImage instanceof File) {
+                filesToProcess++;
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    orderData.productImage = e.target.result;
-                    saveOrderToLocalStorage(orderData);
+                    orderDataCopy.productImage = e.target.result;
+                    processedFiles++;
+                    if (processedFiles === filesToProcess) {
+                        saveOrderToLocalStorage(orderDataCopy);
+                    }
                 };
                 reader.readAsDataURL(orderData.productImage);
-            } else {
-                saveOrderToLocalStorage(orderData);
             }
             
+            // Process payment screenshot if it exists
             if (orderData.paymentScreenshot instanceof File) {
+                filesToProcess++;
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    orderData.paymentScreenshot = e.target.result;
-                    saveOrderToLocalStorage(orderData);
+                    orderDataCopy.paymentScreenshot = e.target.result;
+                    processedFiles++;
+                    if (processedFiles === filesToProcess) {
+                        saveOrderToLocalStorage(orderDataCopy);
+                    }
                 };
                 reader.readAsDataURL(orderData.paymentScreenshot);
-            } else {
-                saveOrderToLocalStorage(orderData);
+            }
+            
+            // If no files to process, save immediately
+            if (filesToProcess === 0) {
+                saveOrderToLocalStorage(orderDataCopy);
             }
         }
         
