@@ -539,7 +539,13 @@
             const orders = JSON.parse(localStorage.getItem('allOrders') || '[]');
             const order = orders.find(order => order.orderId === orderId);
             
-            if (!order) return;
+            if (!order) {
+                console.error('Order not found with ID:', orderId);
+                return;
+            }
+            
+            console.log('Opening order details with ID:', orderId);
+            console.log('Order keys:', Object.keys(order));
             
             // Populate modal with order details
             document.getElementById('modalOrderId').textContent = order.orderId;
@@ -547,15 +553,17 @@
             document.getElementById('modalCustomerName').textContent = order.name;
             document.getElementById('modalCustomerPhone').textContent = order.phone;
             document.getElementById('modalCustomerAddress').textContent = order.address;
-            document.getElementById('modalPaymentNumber').textContent = order.senderNumber;
-            document.getElementById('modalTransactionId').textContent = order.transactionId;
+            document.getElementById('modalPaymentNumber').textContent = order.senderNumber || '';
+            document.getElementById('modalTransactionId').textContent = order.transactionId || '';
             document.getElementById('modalProductLink').textContent = order.productLink || 'উল্লেখ করা হয়নি';
             
             // Display product image
             const productImageContainer = document.getElementById('productImage');
-            if (order.productImage) {
+            if (order.productImage && typeof order.productImage === 'string' && order.productImage.startsWith('data:image')) {
+                console.log('Product image found, starting with:', order.productImage.substring(0, 50) + '...');
                 productImageContainer.innerHTML = `<img src="${order.productImage}" alt="প্রোডাক্ট ছবি" class="img-fluid">`;
             } else {
+                console.log('No valid product image found:', typeof order.productImage);
                 productImageContainer.innerHTML = `
                     <div class="no-image-message">
                         <i class="fas fa-image fa-2x mb-2"></i>
@@ -566,9 +574,11 @@
             
             // Display payment screenshot
             const paymentScreenshotContainer = document.getElementById('paymentScreenshotContainer');
-            if (order.paymentScreenshot) {
+            if (order.paymentScreenshot && typeof order.paymentScreenshot === 'string' && order.paymentScreenshot.startsWith('data:image')) {
+                console.log('Payment screenshot found, starting with:', order.paymentScreenshot.substring(0, 50) + '...');
                 paymentScreenshotContainer.innerHTML = `<img src="${order.paymentScreenshot}" alt="পেমেন্ট স্ক্রিনশট" class="img-fluid">`;
             } else {
+                console.log('No valid payment screenshot found:', typeof order.paymentScreenshot);
                 paymentScreenshotContainer.innerHTML = `
                     <div class="no-image-message">
                         <i class="fas fa-receipt fa-2x mb-2"></i>
@@ -582,6 +592,9 @@
             
             // Store order ID in the modal for update reference
             document.getElementById('saveStatusBtn').setAttribute('data-order-id', order.orderId);
+            
+            // For debugging
+            console.log('Finished loading order details');
             
             // Show modal
             new bootstrap.Modal(document.getElementById('orderDetailsModal')).show();
